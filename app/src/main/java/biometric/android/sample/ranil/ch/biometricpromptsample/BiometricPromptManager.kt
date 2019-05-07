@@ -1,11 +1,13 @@
 package biometric.android.sample.ranil.ch.biometricpromptsample
 
+import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.biometric.BiometricPrompt
+import androidx.core.os.CancellationSignal
 import androidx.fragment.app.FragmentActivity
 import java.security.Key
 import java.security.KeyStore
@@ -20,13 +22,13 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
     private val sharedPreferences: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
     private val keyStore: KeyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
 
-    fun showRestoreFingerprintPrompt(fallbackAction: () -> Unit, proceedAction: (ByteArray) -> Unit) {
+    fun showRestoreFingerprintPrompt(fallbackAction: () -> Unit, successAction: (ByteArray) -> Unit) {
         try {
             val secretKey = getKey()
             val initializationVector = getInitializationVector()
             if (secretKey != null && initializationVector != null) {
                 val cipher = getRestoreCipher(secretKey, initializationVector)
-                handleRestoreFingerprint(cipher, fallbackAction, proceedAction)
+                handleRestoreFingerprint(cipher, fallbackAction, successAction)
             } else {
                 fallbackAction()
             }
@@ -35,7 +37,11 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
         }
     }
 
-    fun showSaveFingerprintPrompt(dataSupplier: () -> ByteArray, fallbackAction: () -> Unit, successAction: () -> Unit) {
+    fun showSaveFingerprintPrompt(
+        dataSupplier: () -> ByteArray,
+        fallbackAction: () -> Unit,
+        successAction: (ByteArray) -> Unit
+    ) {
         try {
             val secretKey = createKey()
             val cipher = getSaveCipher(secretKey)
@@ -49,7 +55,8 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
 
     private fun createKey(): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(ALGORITHM, KEYSTORE)
-        val keyGenParameterSpec = KeyGenParameterSpec.Builder(KEY_NAME, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+        val keyGenParameterSpec =
+            KeyGenParameterSpec.Builder(KEY_NAME, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(BLOCK_MODE)
                 .setEncryptionPaddings(PADDING)
                 .setUserAuthenticationRequired(true)
@@ -83,12 +90,16 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
     }
 
     private fun getRestoreCipher(key: Key, iv: ByteArray): Cipher =
-            Cipher.getInstance(keyTransformation()).apply { init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv)) }
+        Cipher.getInstance(keyTransformation()).apply { init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv)) }
 
     private fun getSaveCipher(key: Key): Cipher =
-            Cipher.getInstance(keyTransformation()).apply { init(Cipher.ENCRYPT_MODE, key) }
+        Cipher.getInstance(keyTransformation()).apply { init(Cipher.ENCRYPT_MODE, key) }
 
-    private fun handleRestoreFingerprint(cipher: Cipher, fallbackAction: () -> Unit, proceedAction: (ByteArray) -> Unit) {
+    private fun handleRestoreFingerprint(
+        cipher: Cipher,
+        fallbackAction: () -> Unit,
+        proceedAction: (ByteArray) -> Unit
+    ) {
 
         val executor = Executors.newSingleThreadExecutor()
         val biometricPrompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
@@ -97,13 +108,13 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
                 result.cryptoObject?.cipher?.let { cipher ->
                     val encrypted = getEncryptedData()
                     val data = cipher.doFinal(encrypted)
-                    proceedAction(data)
+                    activity.runOnUiThread { proceedAction(data) }
                 }
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
-                fallbackAction()
+                activity.runOnUiThread { fallbackAction() }
             }
         })
 
@@ -111,7 +122,12 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
         biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
     }
 
-    private fun handleSaveFingerprint(cipher: Cipher, dataSupplier: () -> ByteArray, fallbackAction: () -> Unit, proceedAction: () -> Unit) {
+    private fun handleSaveFingerprint(
+        cipher: Cipher,
+        dataSupplier: () -> ByteArray,
+        fallbackAction: () -> Unit,
+        successAction: (ByteArray) -> Unit
+    ) {
 
         val executor = Executors.newSingleThreadExecutor()
         val biometricPrompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
@@ -121,13 +137,13 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
                     val iv = resultCipher.iv
                     val loginTokenEncrypted = cipher.doFinal(dataSupplier())
                     saveEncryptedData(loginTokenEncrypted, iv)
-                    proceedAction()
+                    activity.runOnUiThread { successAction(loginTokenEncrypted) }
                 }
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
-                fallbackAction()
+                activity.runOnUiThread { fallbackAction() }
             }
         })
 
@@ -137,11 +153,11 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
 
     private fun biometricPromptInfo(): BiometricPrompt.PromptInfo {
         return BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Prompt Title")
-                .setSubtitle("Prompt Subtitle")
-                .setDescription("Prompt Description: lorem ipsum dolor sit amet.")
-                .setNegativeButtonText(activity.getString(android.R.string.cancel))
-                .build()
+            .setTitle("Prompt Title")
+            .setSubtitle("Prompt Subtitle")
+            .setDescription("Prompt Description: lorem ipsum dolor sit amet.")
+            .setNegativeButtonText(activity.getString(android.R.string.cancel))
+            .build()
     }
 
     companion object {
