@@ -1,13 +1,12 @@
 package biometric.android.sample.ranil.ch.biometricpromptsample
 
-import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.biometric.BiometricPrompt
-import androidx.core.os.CancellationSignal
+import androidx.core.content.edit
 import androidx.fragment.app.FragmentActivity
 import java.security.Key
 import java.security.KeyStore
@@ -22,13 +21,13 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
     private val sharedPreferences: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
     private val keyStore: KeyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
 
-    fun showRestoreFingerprintPrompt(fallbackAction: () -> Unit, successAction: (ByteArray) -> Unit) {
+    fun decryptPrompt(fallbackAction: () -> Unit, successAction: (ByteArray) -> Unit) {
         try {
             val secretKey = getKey()
             val initializationVector = getInitializationVector()
             if (secretKey != null && initializationVector != null) {
-                val cipher = getRestoreCipher(secretKey, initializationVector)
-                handleRestoreFingerprint(cipher, fallbackAction, successAction)
+                val cipher = getDecryptCipher(secretKey, initializationVector)
+                handleDecrypt(cipher, fallbackAction, successAction)
             } else {
                 fallbackAction()
             }
@@ -37,15 +36,15 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
         }
     }
 
-    fun showSaveFingerprintPrompt(
+    fun encryptPrompt(
         dataSupplier: () -> ByteArray,
         fallbackAction: () -> Unit,
         successAction: (ByteArray) -> Unit
     ) {
         try {
             val secretKey = createKey()
-            val cipher = getSaveCipher(secretKey)
-            handleSaveFingerprint(cipher, dataSupplier, fallbackAction, successAction)
+            val cipher = getEncryptCipher(secretKey)
+            handleEncrypt(cipher, dataSupplier, fallbackAction, successAction)
         } catch (e: Exception) {
             fallbackAction()
         }
@@ -83,19 +82,19 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
     }
 
     private fun saveEncryptedData(dataEncrypted: ByteArray, initializationVector: ByteArray) {
-        val editor = sharedPreferences.edit()
-        editor.putString(DATA_ENCRYPTED, Base64.encodeToString(dataEncrypted, Base64.DEFAULT))
-        editor.putString(INITIALIZATION_VECTOR, Base64.encodeToString(initializationVector, Base64.DEFAULT))
-        editor.apply()
+        sharedPreferences.edit {
+            putString(DATA_ENCRYPTED, Base64.encodeToString(dataEncrypted, Base64.DEFAULT))
+            putString(INITIALIZATION_VECTOR, Base64.encodeToString(initializationVector, Base64.DEFAULT))
+        }
     }
 
-    private fun getRestoreCipher(key: Key, iv: ByteArray): Cipher =
+    private fun getDecryptCipher(key: Key, iv: ByteArray): Cipher =
         Cipher.getInstance(keyTransformation()).apply { init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv)) }
 
-    private fun getSaveCipher(key: Key): Cipher =
+    private fun getEncryptCipher(key: Key): Cipher =
         Cipher.getInstance(keyTransformation()).apply { init(Cipher.ENCRYPT_MODE, key) }
 
-    private fun handleRestoreFingerprint(
+    private fun handleDecrypt(
         cipher: Cipher,
         fallbackAction: () -> Unit,
         proceedAction: (ByteArray) -> Unit
@@ -122,7 +121,7 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
         biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
     }
 
-    private fun handleSaveFingerprint(
+    private fun handleEncrypt(
         cipher: Cipher,
         dataSupplier: () -> ByteArray,
         fallbackAction: () -> Unit,
