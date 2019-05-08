@@ -1,4 +1,4 @@
-package biometric.android.sample.ranil.ch.biometricpromptsample
+package ch.ranil.sample.android.biometricpromptsample
 
 import android.os.Bundle
 import android.widget.Toast
@@ -15,25 +15,25 @@ class MainActivity : AppCompatActivity() {
 
         biometricPromptManager = BiometricPromptManager(this)
 
-        val secureText = "Secure Text ${System.currentTimeMillis()}"
+        val secureText = "Secure Text!"
         textView.text = secureText
         buttonEncrypt.setOnClickListener {
             biometricPromptManager.encryptPrompt(
                 dataSupplier = { secureText.toByteArray() },
-                fallbackAction = { showToast("save fallback") },
+                fallbackAction = { showToast("encrypt fallback") },
                 successAction = {
-                    showToast("save success")
                     textView.text = String(it)
+                    showToast("encrypt success")
                 }
             )
         }
 
         buttonDecrypt.setOnClickListener {
             biometricPromptManager.decryptPrompt(
-                fallbackAction = { showToast("restore fallback") },
+                fallbackAction = { showToast("decrypt fallback") },
                 successAction = {
-                    showToast("restore success")
                     textView.text = String(it)
+                    showToast("decrypt success")
                 }
             )
         }

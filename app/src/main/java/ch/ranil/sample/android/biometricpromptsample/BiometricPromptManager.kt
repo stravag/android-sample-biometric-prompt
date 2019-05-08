@@ -1,4 +1,4 @@
-package biometric.android.sample.ranil.ch.biometricpromptsample
+package ch.ranil.sample.android.biometricpromptsample
 
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
