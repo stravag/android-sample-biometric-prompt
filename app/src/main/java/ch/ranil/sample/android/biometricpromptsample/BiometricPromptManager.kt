@@ -5,6 +5,7 @@ import android.preference.PreferenceManager
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.util.Log
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.edit
 import androidx.fragment.app.FragmentActivity
@@ -32,6 +33,7 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
                 fallbackAction()
             }
         } catch (e: Exception) {
+            Log.d(TAG, "Decrypt BiometricPrompt exception", e)
             fallbackAction()
         }
     }
@@ -46,6 +48,7 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
             val cipher = getEncryptCipher(secretKey)
             handleEncrypt(cipher, dataSupplier, fallbackAction, successAction)
         } catch (e: Exception) {
+            Log.d(TAG, "Encrypt BiometricPrompt exception", e)
             fallbackAction()
         }
     }
@@ -160,6 +163,7 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
     }
 
     companion object {
+        private const val TAG = "BiometricPrompt"
         private const val KEYSTORE = "AndroidKeyStore"
         private const val KEY_NAME = "MY_KEY"
         private const val DATA_ENCRYPTED = "DATA_ENCRYPTED"
