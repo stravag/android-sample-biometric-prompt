@@ -116,6 +116,7 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
+                Log.d(TAG, "Authentication error. $errString ($errorCode)")
                 activity.runOnUiThread { fallbackAction() }
             }
         })
@@ -145,6 +146,7 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
+                Log.d(TAG, "Authentication error. $errString ($errorCode)")
                 activity.runOnUiThread { fallbackAction() }
             }
         })
