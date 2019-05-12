@@ -22,34 +22,34 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
     private val sharedPreferences: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
     private val keyStore: KeyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
 
-    fun decryptPrompt(fallbackAction: () -> Unit, successAction: (ByteArray) -> Unit) {
+    fun decryptPrompt(failedAction: () -> Unit, successAction: (ByteArray) -> Unit) {
         try {
             val secretKey = getKey()
             val initializationVector = getInitializationVector()
             if (secretKey != null && initializationVector != null) {
                 val cipher = getDecryptCipher(secretKey, initializationVector)
-                handleDecrypt(cipher, fallbackAction, successAction)
+                handleDecrypt(cipher, failedAction, successAction)
             } else {
-                fallbackAction()
+                failedAction()
             }
         } catch (e: Exception) {
             Log.d(TAG, "Decrypt BiometricPrompt exception", e)
-            fallbackAction()
+            failedAction()
         }
     }
 
     fun encryptPrompt(
-        dataSupplier: () -> ByteArray,
-        fallbackAction: () -> Unit,
+        data: ByteArray,
+        failedAction: () -> Unit,
         successAction: (ByteArray) -> Unit
     ) {
         try {
             val secretKey = createKey()
             val cipher = getEncryptCipher(secretKey)
-            handleEncrypt(cipher, dataSupplier, fallbackAction, successAction)
+            handleEncrypt(cipher, data, failedAction, successAction)
         } catch (e: Exception) {
             Log.d(TAG, "Encrypt BiometricPrompt exception", e)
-            fallbackAction()
+            failedAction()
         }
     }
 
@@ -99,8 +99,8 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
 
     private fun handleDecrypt(
         cipher: Cipher,
-        fallbackAction: () -> Unit,
-        proceedAction: (ByteArray) -> Unit
+        failedAction: () -> Unit,
+        successAction: (ByteArray) -> Unit
     ) {
 
         val executor = Executors.newSingleThreadExecutor()
@@ -110,14 +110,14 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
                 result.cryptoObject?.cipher?.let { cipher ->
                     val encrypted = getEncryptedData()
                     val data = cipher.doFinal(encrypted)
-                    activity.runOnUiThread { proceedAction(data) }
+                    activity.runOnUiThread { successAction(data) }
                 }
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
                 Log.d(TAG, "Authentication error. $errString ($errorCode)")
-                activity.runOnUiThread { fallbackAction() }
+                activity.runOnUiThread { failedAction() }
             }
         })
 
@@ -127,8 +127,8 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
 
     private fun handleEncrypt(
         cipher: Cipher,
-        dataSupplier: () -> ByteArray,
-        fallbackAction: () -> Unit,
+        data: ByteArray,
+        failedAction: () -> Unit,
         successAction: (ByteArray) -> Unit
     ) {
 
@@ -138,16 +138,16 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
                 super.onAuthenticationSucceeded(result)
                 result.cryptoObject?.cipher?.let { resultCipher ->
                     val iv = resultCipher.iv
-                    val loginTokenEncrypted = cipher.doFinal(dataSupplier())
-                    saveEncryptedData(loginTokenEncrypted, iv)
-                    activity.runOnUiThread { successAction(loginTokenEncrypted) }
+                    val encryptedData = resultCipher.doFinal(data)
+                    saveEncryptedData(encryptedData, iv)
+                    activity.runOnUiThread { successAction(encryptedData) }
                 }
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
                 Log.d(TAG, "Authentication error. $errString ($errorCode)")
-                activity.runOnUiThread { fallbackAction() }
+                activity.runOnUiThread { failedAction() }
             }
         })
 

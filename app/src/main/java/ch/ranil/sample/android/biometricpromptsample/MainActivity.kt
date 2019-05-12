@@ -19,8 +19,8 @@ class MainActivity : AppCompatActivity() {
         textView.text = secureText
         buttonEncrypt.setOnClickListener {
             biometricPromptManager.encryptPrompt(
-                dataSupplier = { secureText.toByteArray() },
-                fallbackAction = { showToast("encrypt fallback") },
+                data = secureText.toByteArray(),
+                failedAction = { showToast("encrypt failed") },
                 successAction = {
                     textView.text = String(it)
                     showToast("encrypt success")
@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
 
         buttonDecrypt.setOnClickListener {
             biometricPromptManager.decryptPrompt(
-                fallbackAction = { showToast("decrypt fallback") },
+                failedAction = { showToast("decrypt failed") },
                 successAction = {
                     textView.text = String(it)
                     showToast("decrypt success")
